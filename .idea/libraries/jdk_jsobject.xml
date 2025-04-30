@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="jdk.jsobject">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/jdk.jsobject.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

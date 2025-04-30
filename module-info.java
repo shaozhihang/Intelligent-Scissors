@@ -6,6 +6,7 @@ module src {
     requires javafx.media;
     requires javafx.swing;
     requires javafx.web;
+    requires java.desktop;
 
     opens src;
 

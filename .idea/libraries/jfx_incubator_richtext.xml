@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="jfx.incubator.richtext">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/jfx.incubator.richtext.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
