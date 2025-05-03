@@ -21,20 +21,20 @@ public class ProcessMatrix {
     /**
      * 使用Sx Kernel计算像素点的Ix值
      * @param matrix 像素矩阵
-     * @param width 水平宽度
      * @param height 垂直高度
-     * @param x 像素点横坐标
-     * @param y 像素点纵坐标
+     * @param width 水平宽度
+     * @param x 像素点纵坐标
+     * @param y 像素点横坐标
      * @return 像素点的Ix值
      */
-    public static int findIx(int[][] matrix, int width, int height, int x, int y) {
+    public static int findIx(int[][] matrix, int height, int width, int x, int y) {
         int Ix = 0;
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 int xIndex = x + i;
                 int yIndex = y + j;
-                if (xIndex >= 0 && xIndex < width && yIndex >= 0 && yIndex < height) {
-                    Ix += matrix[yIndex][xIndex] * Sx[i + 1][j + 1];
+                if (xIndex >= 0 && xIndex < height && yIndex >= 0 && yIndex < width) {
+                    Ix += matrix[xIndex][yIndex] * Sx[i + 1][j + 1];
                 }
                 //若在边界上则用零像素填充，故可以不写
             }
@@ -45,20 +45,20 @@ public class ProcessMatrix {
     /**
      * 使用Sy Kernel计算像素点的Iy值
      * @param matrix 像素矩阵
-     * @param width 水平宽度
      * @param height 垂直高度
-     * @param x 像素点横坐标
-     * @param y 像素点纵坐标
-     * @return 像素点的Ix值
+     * @param width 水平宽度
+     * @param x 像素点纵坐标
+     * @param y 像素点横坐标
+     * @return 像素点的Iy值
      */
-    public static int findIy(int[][] matrix, int width, int height, int x, int y) {
+    public static int findIy(int[][] matrix, int height, int width, int x, int y) {
         int Iy = 0;
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 int xIndex = x + i;
                 int yIndex = y + j;
-                if (xIndex >= 0 && xIndex < width && yIndex >= 0 && yIndex < height) {
-                    Iy += matrix[yIndex][xIndex] * Sy[i + 1][j + 1];
+                if (xIndex >= 0 && xIndex < height && yIndex >= 0 && yIndex < width) {
+                    Iy += matrix[xIndex][yIndex] * Sy[i + 1][j + 1];
                 }
                 //若在边界上则用零像素填充，故可以不写
             }
@@ -74,13 +74,13 @@ public class ProcessMatrix {
      * @param height 垂直高度
      * @return G矩阵
      */
-    public static double[][] findGMatrix(int[][] matrix, int width, int height) {
-        double[][] gMatrix = new double[width][height];
+    public static double[][] findGMatrix(int[][] matrix, int height, int width) {
+        double[][] gMatrix = new double[height][width];
 
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < height; j++) {
-                int Ix = findIx(matrix, width, height, i, j);
-                int Iy = findIy(matrix, width, height, i, j);
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
+                int Ix = findIx(matrix, height, width, i, j);
+                int Iy = findIy(matrix, height, width, i, j);
                 gMatrix[i][j] = Math.sqrt(Ix * Ix + Iy * Iy);
             }
         }
@@ -95,13 +95,13 @@ public class ProcessMatrix {
      * @param height 垂直高度
      * @return 归一化处理后的f_G值矩阵
      */
-    public static double[][] findFgMatrix(double[][] gMatrix, int width, int height) {
-        double[][] fgMatrix = new double[width][height];
+    public static double[][] findFgMatrix(double[][] gMatrix, int height, int width) {
+        double[][] fgMatrix = new double[height][width];
         double maxG = 0;
 
         // 寻找maxG
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < height; j++) {
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
                 if (gMatrix[i][j] > maxG) {
                     maxG = gMatrix[i][j];
                 }
@@ -109,8 +109,8 @@ public class ProcessMatrix {
         }
 
         // 归一化处理
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < height; j++) {
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < width; j++) {
                 fgMatrix[i][j] = 1 - gMatrix[i][j] / maxG;
             }
         }
@@ -124,6 +124,7 @@ public class ProcessMatrix {
                 {0, 1, 2, 3, 0},
                 {0, 4, 5, 6, 0},
                 {0, 7, 8, 9, 0},
+                {0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0}
         };
         double[][] gMatrix = findGMatrix(matrix, matrix.length, matrix[0].length);
