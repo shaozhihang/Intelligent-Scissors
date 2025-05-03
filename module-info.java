@@ -7,7 +7,7 @@ module src {
     requires javafx.swing;
     requires javafx.web;
     requires javafx.swt;
-
+    requires java.desktop;
     opens src;
 
 }

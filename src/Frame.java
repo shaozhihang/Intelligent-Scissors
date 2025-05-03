@@ -337,4 +337,5 @@ public class Frame extends Application {
         filters.add(filter);
         formatMap.put(filter, imageIOFormat.toUpperCase());
     }
+
 }

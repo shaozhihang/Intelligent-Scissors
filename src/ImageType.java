@@ -1,6 +1,5 @@
 package src;
 
-
 enum ImageType {
     JPG,
     PNG,

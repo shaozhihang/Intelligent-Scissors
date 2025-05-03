@@ -45,8 +45,5 @@ public class ProcessImage {
         return ImageGraph.buildGraph(image);
     }
 
-
-
-
 }
 

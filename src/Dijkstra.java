@@ -2,6 +2,8 @@ package src;
 
 import java.util.*;
 
+// 这是个防止不报错的类，后续要删除或更改的
+
 public class Dijkstra {
     public static List<Node> findShortestPath(Map<Node, List<Edge>> graph, Node start, Node end) {
         // 初始化距离
