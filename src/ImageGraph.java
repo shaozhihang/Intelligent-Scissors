@@ -1,5 +1,6 @@
 package src;
 
+import java.awt.image.BufferedImage;
 import java.util.*;
 
 /**
@@ -56,7 +57,7 @@ public class ImageGraph {
             {1, -1},  {1, 0}, {1, 1}
     };
 
-    protected static Map<Node, List<Edge>> buildGraph(Image image) {
+    protected static Map<Node, List<Edge>> buildGraph(BufferedImage image) {
         int width = image.getWidth();
         int height = image.getHeight();
         Map<Node, List<Edge>> graph = new HashMap<>();
@@ -87,7 +88,7 @@ public class ImageGraph {
         return graph;
     }
 
-    private static double calculateWeight(Image image, int x1, int y1, int x2, int y2) {
+    private static double calculateWeight(BufferedImage image, int x1, int y1, int x2, int y2) {
         int rgb1 = image.getRGB(x1, y1);
         int rgb2 = image.getRGB(x2, y2);
         // 示例：使用灰度差作为权重
