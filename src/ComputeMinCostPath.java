@@ -186,7 +186,7 @@ public class ComputeMinCostPath {
                 {0, 0, 0, 0, 3},
                 {0, 3, 3, 3, 3}
         };
-        double[][] gMatrix = ProcessMatrix.findGMatrix(matrix, matrix.length, matrix[0].length);
+        double[][] gMatrix = ProcessMatrix.findGMatrix(matrix);
         for (int i = 0; i < gMatrix.length; i++) {
             for (int j = 0; j < gMatrix[0].length; j++) {
                 System.out.print(gMatrix[i][j] + " ");

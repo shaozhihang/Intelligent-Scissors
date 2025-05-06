@@ -21,14 +21,14 @@ public class ProcessMatrix {
     /**
      * 使用Sx Kernel计算像素点的Ix值
      * @param matrix 像素矩阵
-     * @param height 垂直高度
-     * @param width 水平宽度
      * @param x 像素点纵坐标
      * @param y 像素点横坐标
      * @return 像素点的Ix值
      */
-    public static int findIx(int[][] matrix, int height, int width, int x, int y) {
+    public static int findIx(int[][] matrix, int x, int y) {
         int Ix = 0;
+        int height = matrix.length;
+        int width = matrix[0].length;
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 int xIndex = x + i;
@@ -45,14 +45,14 @@ public class ProcessMatrix {
     /**
      * 使用Sy Kernel计算像素点的Iy值
      * @param matrix 像素矩阵
-     * @param height 垂直高度
-     * @param width 水平宽度
      * @param x 像素点纵坐标
      * @param y 像素点横坐标
      * @return 像素点的Iy值
      */
-    public static int findIy(int[][] matrix, int height, int width, int x, int y) {
+    public static int findIy(int[][] matrix, int x, int y) {
         int Iy = 0;
+        int height = matrix.length;
+        int width = matrix[0].length;
         for (int i = -1; i <= 1; i++) {
             for (int j = -1; j <= 1; j++) {
                 int xIndex = x + i;
@@ -70,17 +70,17 @@ public class ProcessMatrix {
     /**
      * 计算G（梯度值）矩阵
      * @param matrix 像素矩阵
-     * @param width 水平宽度
-     * @param height 垂直高度
      * @return G矩阵
      */
-    public static double[][] findGMatrix(int[][] matrix, int height, int width) {
+    public static double[][] findGMatrix(int[][] matrix) {
+        int height = matrix.length;
+        int width = matrix[0].length;
         double[][] gMatrix = new double[height][width];
 
         for (int i = 0; i < height; i++) {
             for (int j = 0; j < width; j++) {
-                int Ix = findIx(matrix, height, width, i, j);
-                int Iy = findIy(matrix, height, width, i, j);
+                int Ix = findIx(matrix, i, j);
+                int Iy = findIy(matrix, i, j);
                 gMatrix[i][j] = Math.sqrt(Ix * Ix + Iy * Iy);
             }
         }
@@ -91,11 +91,11 @@ public class ProcessMatrix {
     /**
      * 把G矩阵进行归一化，得出归一化处理后的f_G值矩阵，公式为f_G = (G_max - G) / G_max
      * @param gMatrix G矩阵
-     * @param width 水平宽度
-     * @param height 垂直高度
      * @return 归一化处理后的f_G值矩阵
      */
-    public static double[][] findFgMatrix(double[][] gMatrix, int height, int width) {
+    public static double[][] findFgMatrix(double[][] gMatrix) {
+        int height = gMatrix.length;
+        int width = gMatrix[0].length;
         double[][] fgMatrix = new double[height][width];
         double maxG = 0;
 
@@ -127,8 +127,8 @@ public class ProcessMatrix {
                 {0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0}
         };
-        double[][] gMatrix = findGMatrix(matrix, matrix.length, matrix[0].length);
-        double[][] fgMatrix = findFgMatrix(gMatrix, matrix.length, matrix[0].length);
+        double[][] gMatrix = findGMatrix(matrix);
+        double[][] fgMatrix = findFgMatrix(gMatrix);
         for (int i = 0; i < gMatrix.length; i++) {
             for (int j = 0; j < gMatrix[i].length; j++) {
                 System.out.print(gMatrix[i][j] + " ");
