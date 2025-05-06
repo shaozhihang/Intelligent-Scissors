@@ -18,6 +18,7 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,8 +49,6 @@ public class Frame extends Application {
 
     // ===========================场景中的对象===========================
 
-//    private double xOffset = 0;
-//    private double yOffset = 0;
 
     public static void main(String[] args) {
         launch(args);
@@ -59,21 +58,35 @@ public class Frame extends Application {
     public void start(Stage primaryStage) {
         this.primaryStage = primaryStage;
 
-        // 1. 初始化根布局和基础设置
+        // 初始化根布局和基础设置
         root = new BorderPane();
         Scene scene = new Scene(root, 800, 600);
 
-        // 2. 创建顶部工具栏
+        // 创建顶部工具栏
         initToolBar(scene,this.optimizedPathScreen);
 
-        // 3. 初始化图片显示区域
+        // 初始化图片显示区域
         initImageView();
 
-        // 4. 设置事件监听（如快捷键缩放）
+        // 设置事件监听（如快捷键缩放）
         setupEventHandlers(scene);
 
-        // 5. 显示窗口
-        primaryStage.setTitle("Photoshop-Like App");
+        // 设置名称
+        primaryStage.setTitle("智能套索");
+
+        // 设置图标
+        // 相对路径转绝对路径
+        URL iconUrl = getClass().getResource("/icons/lasso.png");
+
+        javafx.scene.image.Image icon = new javafx.scene.image.Image(iconUrl.toExternalForm());// 使用绝对路径
+        // 监听加载错误
+        icon.errorProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                System.err.println("图标加载失败: " + icon.getException());
+            }
+        });
+        primaryStage.getIcons().add(icon);
+        // 添加场景
         primaryStage.setScene(scene);
         primaryStage.show();
     }
