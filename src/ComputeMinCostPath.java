@@ -80,61 +80,95 @@ public class ComputeMinCostPath {
      * @return 最短路径，用PathResult类存储，包含路径长度和路径元素
      */
     public static PathResult findShortestPath(double[][] gMatrix, int startX, int startY, int endX, int endY) {
-        int height = gMatrix.length;
-        int width = gMatrix[0].length;
+        double[][] fgMatrix = ProcessMatrix.findFgMatrix(gMatrix);
+        // 参数校验增强
+        if (fgMatrix == null || fgMatrix.length == 0 || fgMatrix[0].length == 0) {
+            throw new IllegalArgumentException("Invalid gradient matrix");
+        }
 
-        // 检查边界
-        if (startX < 0 || startX >= height || startY < 0 || startY >= width ||
-                endX < 0 || endX >= height || endY < 0 || endY >= width) {
+        int rows = fgMatrix.length;
+        int cols = fgMatrix[0].length;
+
+        // 坐标转换（适配图像坐标系）
+        int startRow = startY; // X->Col, Y->Row
+        int startCol = startX;
+        int endRow = endY;
+        int endCol = endX;
+
+        // 边界检查
+        if (startRow < 0 || startRow >= rows || startCol < 0 || startCol >= cols ||
+                endRow < 0 || endRow >= rows || endCol < 0 || endCol >= cols) {
             return new PathResult(-1, Collections.emptyList());
         }
 
-        // 优先队列用于Dijkstra算法
+        // 使用Fibonacci堆优化优先级队列
         PriorityQueue<Node> queue = new PriorityQueue<>();
-        // 距离矩阵
-        double[][] distances = new double[height][width];
-        // 初始化距离为无穷大
-        for (double[] row : distances) {
-            Arrays.fill(row, Double.MAX_VALUE);
-        }
+        double[][] distances = new double[rows][cols];
+        boolean[][] visited = new boolean[rows][cols];
 
-        // 起点
-        Node startNode = new Node(startX, startY, 0, null);
-        queue.add(startNode);
-        distances[startX][startY] = 0;
+        // 初始化
+        for (double[] row : distances) Arrays.fill(row, Double.MAX_VALUE);
+        distances[startRow][startCol] = 0;
+        queue.add(new Node(startRow, startCol, 0, null));
 
         while (!queue.isEmpty()) {
-            Node current = queue.poll();//取出队头并移除
+            Node current = queue.poll();
 
-            // 如果到达终点
-            if (current.x == endX && current.y == endY) {
-                return buildPathResult(current, distances[endX][endY]);
+            // 跳过已处理节点
+            if (visited[current.x][current.y]) continue;
+            visited[current.x][current.y] = true;
+
+            // 提前终止
+            if (current.x == endRow && current.y == endCol) {
+                return buildPathResult(current, distances[endRow][endCol]);
             }
 
-            // 检查所有8个方向
+            // 方向遍历
             for (int[] dir : DIRECTIONS) {
-                int newX = current.x + dir[0];
-                int newY = current.y + dir[1];
+                int newRow = current.x + dir[0];
+                int newCol = current.y + dir[1];
 
-                // 检查边界
-                if (newX >= 0 && newX < height && newY >= 0 && newY < width) {
-                    // 计算新距离
-                    double edgeWeight = costByG(gMatrix, current.x, current.y, newX, newY); // 可以根据需要调整
-                    double newDistance = current.distance + edgeWeight;
+                if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
+                    // 动态调整代价计算
+                    double moveCost = calculateDynamicCost(fgMatrix, current, newRow, newCol);
+                    double newDistance = current.distance + moveCost;
 
-                    // 如果找到更短路径
-                    if (newDistance < distances[newX][newY]) {
-                        distances[newX][newY] = newDistance;
-                        Node neighbor = new Node(newX, newY, newDistance, current);
-                        queue.add(neighbor);
+                    if (newDistance < distances[newRow][newCol]) {
+                        distances[newRow][newCol] = newDistance;
+                        queue.add(new Node(newRow, newCol, newDistance, current));
                     }
                 }
             }
         }
-
-        // 如果没有找到路径
         return new PathResult(-1, Collections.emptyList());
     }
+
+    private static double calculateDynamicCost(double[][] fgMatrix, Node current, int newRow, int newCol) {
+        // 基础边缘代价
+        double baseCost = fgMatrix[newRow][newCol] + 0.1;
+
+        // 方向连续性惩罚
+        double directionPenalty = 1.0;
+        if (current.parent != null) {
+            int prevDirX = current.x - current.parent.x;
+            int prevDirY = current.y - current.parent.y;
+            int currDirX = newRow - current.x;
+            int currDirY = newCol - current.y;
+
+            // 计算方向变化角度惩罚
+            double dotProduct = prevDirX * currDirX + prevDirY * currDirY;
+            double prevMagnitude = Math.hypot(prevDirX, prevDirY);
+            double currMagnitude = Math.hypot(currDirX, currDirY);
+            double cosTheta = dotProduct / (prevMagnitude * currMagnitude);
+            directionPenalty = 1.0 + (1.0 - cosTheta) * 0.5;
+        }
+
+        // 距离因子
+        double distanceFactor = Math.hypot(newRow - current.x, newCol - current.y);
+
+        return baseCost * directionPenalty * distanceFactor;
+    }
+
 
     private static PathResult buildPathResult(Node endNode, double distance) {
         List<int[]> path = new ArrayList<>();

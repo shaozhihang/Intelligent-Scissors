@@ -47,11 +47,11 @@ public class ProcessMatrix {
     }
 
     private static int findIx(int[][] matrix, int x, int y) {
-        return findIxIy(matrix, x, y, Sx);
+        return findIxIy(matrix, y, x, Sx); // 交换x,y参数
     }
 
     private static int findIy(int[][] matrix, int x, int y) {
-        return findIxIy(matrix, x, y, Sy);
+        return findIxIy(matrix, y, x, Sy); // 交换x,y参数
     }
 
 
@@ -61,18 +61,18 @@ public class ProcessMatrix {
      * @return G矩阵
      */
     public static double[][] findGMatrix(int[][] matrix) {
-        int height = matrix.length;
-        int width = matrix[0].length;
-        double[][] gMatrix = new double[height][width];
+        // 明确维度定义
+        int imageHeight = matrix.length;    // y轴维度（行数）
+        int imageWidth = matrix[0].length;  // x轴维度（列数）
+        double[][] gMatrix = new double[imageHeight][imageWidth];
 
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < width; j++) {
-                int Ix = findIx(matrix, i, j);
-                int Iy = findIy(matrix, i, j);
-                gMatrix[i][j] = Math.sqrt(Ix * Ix + Iy * Iy);
+        for (int y = 0; y < imageHeight; y++) {      // 图像y坐标
+            for (int x = 0; x < imageWidth; x++) {   // 图像x坐标
+                int Ix = findIx(matrix, x, y);      // 传入正确的x,y顺序
+                int Iy = findIy(matrix, x, y);
+                gMatrix[y][x] = Math.sqrt(Ix * Ix + Iy * Iy); // y行x列
             }
         }
-
         return gMatrix;
     }
 
