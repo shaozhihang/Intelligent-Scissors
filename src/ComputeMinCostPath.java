@@ -65,7 +65,7 @@ public class ComputeMinCostPath {
             return 1 / ( gMatrix[x2][y2] + 1 ) / Math.sqrt(2);
         }
         else { //两点不相连
-            return 1e6;
+            return Double.POSITIVE_INFINITY;
         }
     }
 
