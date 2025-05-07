@@ -1,5 +1,6 @@
 package src;
 
+import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferInt;
 import java.util.List;
 import java.util.Map;
@@ -17,7 +18,7 @@ public class ProcessImage {
     /// 把图像转换为像素点矩阵
     /// @param image 原始图片对象
     /// @return 二维int类型数组，表示传入图片的像素点矩阵
-    public static int[][] toRGBMatrix(Image image){
+    public static int[][] toRGBMatrix(BufferedImage image) {
         int width = image.getWidth();
         int height = image.getHeight();
         int[][] pixelMatrix = new int[width][height];
@@ -40,12 +41,9 @@ public class ProcessImage {
      * @param image 要处理的Image类型图像
      * @return 一个包含节点与其所连接的边们的映射列表
      */
-    public static Map<Node, List<Edge>> toGraph(Image image) {
+    public static Map<Node, List<Edge>> toGraph(BufferedImage image) {
         return ImageGraph.buildGraph(image);
     }
-
-
-
 
 }
 

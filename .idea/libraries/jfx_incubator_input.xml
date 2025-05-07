@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="jfx.incubator.input">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/lib/jfx.incubator.input.jar!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>
