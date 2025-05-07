@@ -178,16 +178,33 @@ public class Frame extends Application {
                 overlayCanvas.getHeight());
         if (isMagneticLassoActive && e.getButton() == MouseButton.PRIMARY) {
             System.out.println("[Debug] 条件满足：模式已激活 + 左键点击");
-            Point2D mousePoint = new Point2D(e.getX(), e.getY());
+            Point2D rawScreenPoint = new Point2D(e.getX(), e.getY());
+
+            // 转换为图像坐标（行列索引）
+            SeedPoint rawSeed = convertToSeedPoint(rawScreenPoint);
+            int[] mousePoint = new int[]{rawSeed.getY(), rawSeed.getX()}; // 注意坐标顺序
+
+            // 调用CursorSnap吸附逻辑
+            int[] snappedPoint = new CursorSnap().findSnapPoint(
+                    mousePoint,
+                    gMatrix,
+                    10 // snapRate（示例值，图像高度的1%）
+            );
+
+            // 将吸附后的图像坐标转换为屏幕坐标
+            Point2D snappedScreenPoint = new Point2D(
+                    snappedPoint[1] / scaleX, // 根据实际比例因子调整
+                    snappedPoint[0] / scaleY
+            );
 
             // 检测是否闭合路径
-            if (!seedPoints.isEmpty() && isNearFirstSeed(mousePoint)) {
+            if (!seedPoints.isEmpty() && isNearFirstSeed(snappedScreenPoint)) {
                 completeLasso();
                 return;
             }
 
             // 添加新种子点
-            SeedPoint newSeed = convertToSeedPoint(mousePoint);
+            SeedPoint newSeed = convertToSeedPoint(snappedScreenPoint);
             seedPoints.add(newSeed);
             currentSeed = newSeed;
 
