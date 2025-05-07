@@ -1,5 +1,7 @@
 package src;
 
+import java.lang.reflect.Array;
+
 /**
  * @author 邵之航
  * @version 1.1
@@ -18,39 +20,17 @@ public class ProcessMatrix {
             {1, 2, 1}
     };
 
-    /**
-     * 使用Sx Kernel计算像素点的Ix值
-     * @param matrix 像素矩阵
-     * @param x 像素点纵坐标
-     * @param y 像素点横坐标
-     * @return 像素点的Ix值
-     */
-    public static int findIx(int[][] matrix, int x, int y) {
-        int Ix = 0;
-        int height = matrix.length;
-        int width = matrix[0].length;
-        for (int i = -1; i <= 1; i++) {
-            for (int j = -1; j <= 1; j++) {
-                int xIndex = x + i;
-                int yIndex = y + j;
-                if (xIndex >= 0 && xIndex < height && yIndex >= 0 && yIndex < width) {
-                    Ix += matrix[xIndex][yIndex] * Sx[i + 1][j + 1];
-                }
-                //若在边界上则用零像素填充，故可以不写
-            }
-        }
-        return Ix;
-    }
 
     /**
-     * 使用Sy Kernel计算像素点的Iy值
+     * 使用Sx或Sy Kernel计算像素点的Ix或Iy值
      * @param matrix 像素矩阵
-     * @param x 像素点纵坐标
-     * @param y 像素点横坐标
-     * @return 像素点的Iy值
+     * @param x 像素点横坐标
+     * @param y 像素点纵坐标
+     * @param S 计算Ix用Sx，计算Iy用Sy
+     * @return 像素点的Ix或Iy值
      */
-    public static int findIy(int[][] matrix, int x, int y) {
-        int Iy = 0;
+    private static int findIxIy(int[][] matrix, int x, int y, int[][] S) {
+        int I = 0;
         int height = matrix.length;
         int width = matrix[0].length;
         for (int i = -1; i <= 1; i++) {
@@ -58,12 +38,20 @@ public class ProcessMatrix {
                 int xIndex = x + i;
                 int yIndex = y + j;
                 if (xIndex >= 0 && xIndex < height && yIndex >= 0 && yIndex < width) {
-                    Iy += matrix[xIndex][yIndex] * Sy[i + 1][j + 1];
+                    I += matrix[xIndex][yIndex] * S[i + 1][j + 1];
                 }
                 //若在边界上则用零像素填充，故可以不写
             }
         }
-        return Iy;
+        return I;
+    }
+
+    private static int findIx(int[][] matrix, int x, int y) {
+        return findIxIy(matrix, x, y, Sx);
+    }
+
+    private static int findIy(int[][] matrix, int x, int y) {
+        return findIxIy(matrix, x, y, Sy);
     }
 
 
@@ -117,6 +105,45 @@ public class ProcessMatrix {
 
         return fgMatrix;
     }
+
+    /**
+     * int矩阵的转置
+     * @param matrix 待转置的矩阵
+     * @return 转置之后的矩阵
+     */
+    public static int[][] convertIntMatrix(int[][] matrix) {
+        int height = matrix.length;//原矩阵的高度是新矩阵的宽度
+        int width = matrix[0].length;//原矩阵的宽度是新矩阵的高度
+
+        int[][] res =  new int[width][height];
+
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
+                res[i][j] = matrix[j][i]; // 行列互换
+            }
+        }
+        return res;
+    }
+
+    /**
+     * double矩阵的转置
+     * @param matrix 待转置的矩阵
+     * @return 转置之后的矩阵
+     */
+    public static double[][] convertDoubleMatrix(double[][] matrix) {
+        int height = matrix.length;//原矩阵的高度是新矩阵的宽度
+        int width = matrix[0].length;//原矩阵的宽度是新矩阵的高度
+
+        double[][] res =  new double[width][height];
+
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
+                res[i][j] = matrix[j][i]; // 行列互换
+            }
+        }
+        return res;
+    }
+
     public static void main(String[] args) {
         // 测试代码
         int[][] matrix = {
@@ -127,6 +154,14 @@ public class ProcessMatrix {
                 {0, 0, 0, 0, 0},
                 {0, 0, 0, 0, 0}
         };
+
+        int[][] mat2 = convertIntMatrix(matrix);
+        for(int i = 0; i < mat2.length; i++) {
+            for(int j = 0; j < mat2[0].length; j++) {
+                System.out.print(mat2[i][j] + " ");
+            }
+            System.out.println();
+        }
         double[][] gMatrix = findGMatrix(matrix);
         double[][] fgMatrix = findFgMatrix(gMatrix);
         for (int i = 0; i < gMatrix.length; i++) {

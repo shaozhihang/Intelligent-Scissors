@@ -4,7 +4,7 @@ import java.util.*;
 
 /**
  * @author 邵之航
- * @version 1.0
+ * @version 1.1
  * @apiNote 计算最短路
  */
 public class ComputeMinCostPath {
@@ -12,7 +12,7 @@ public class ComputeMinCostPath {
     // 表示矩阵上的一个节点
     static class Node implements Comparable<Node> {
         int x, y;
-        double distance;
+        double distance;//到seed point距离
         Node parent;
 
         public Node(int x, int y, double distance, Node parent) {
