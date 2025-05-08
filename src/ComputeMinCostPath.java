@@ -70,19 +70,36 @@ public class ComputeMinCostPath {
     }
 
 
+
     /**
      * 在梯度矩阵上计算最短路
-     * @param gMatrix 梯度矩阵
+     * @param matrix RGB矩阵
      * @param startX 起点横坐标
      * @param startY 起点纵坐标
      * @param endX 终点横坐标
      * @param endY 终点纵坐标
      * @return 最短路径，用PathResult类存储，包含路径长度和路径元素
      */
-    public static PathResult findShortestPath(double[][] gMatrix, int startX, int startY, int endX, int endY) {
+    public static PathResult findShortestPath(int[][] matrix, int startX, int startY, int endX, int endY) {
+
+
+        //初始化
+        double[][] gMatrix = ProcessMatrix.findGMatrix(matrix);
         double[][] fgMatrix = ProcessMatrix.findFgMatrix(gMatrix);
+        double[][] IxMatrix = new double[matrix.length][matrix[0].length];
+        double[][] IyMatrix = new double[matrix.length][matrix[0].length];
+        boolean[][] zeroCrossing = ProcessMatrix.computeZeroCrossing(matrix);
+        for (int y = 0; y < matrix.length; y++) {      // 图像y坐标
+            for (int x = 0; x < matrix[0].length; x++) {   // 图像x坐标
+                int Ix = ProcessMatrix.findIx(matrix, x, y);      // 传入正确的x,y顺序
+                int Iy = ProcessMatrix.findIy(matrix, x, y);
+                IxMatrix[y][x] = Ix;
+                IyMatrix[y][x] = Iy;
+            }
+        }
+
         // 参数校验增强
-        if (fgMatrix == null || fgMatrix.length == 0 || fgMatrix[0].length == 0) {
+        if (fgMatrix.length == 0 || fgMatrix[0].length == 0) {
             throw new IllegalArgumentException("Invalid gradient matrix");
         }
 
@@ -98,6 +115,7 @@ public class ComputeMinCostPath {
         // 边界检查
         if (startRow < 0 || startRow >= rows || startCol < 0 || startCol >= cols ||
                 endRow < 0 || endRow >= rows || endCol < 0 || endCol >= cols) {
+            System.out.println("[Debug] 边界检查失败");
             return new PathResult(-1, Collections.emptyList());
         }
 
@@ -112,6 +130,7 @@ public class ComputeMinCostPath {
         queue.add(new Node(startRow, startCol, 0, null));
 
         while (!queue.isEmpty()) {
+            System.out.println(queue.size());
             Node current = queue.poll();
 
             // 跳过已处理节点
@@ -131,6 +150,9 @@ public class ComputeMinCostPath {
                 if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
                     // 动态调整代价计算
                     double moveCost = calculateDynamicCost(fgMatrix, current, newRow, newCol);
+                    //double moveCost = computeCost(gMatrix, fgMatrix, IxMatrix, IyMatrix, zeroCrossing, current, newRow, newCol);
+                    System.out.println("Cost: " + moveCost);
+
                     double newDistance = current.distance + moveCost;
 
                     if (newDistance < distances[newRow][newCol]) {
@@ -141,6 +163,22 @@ public class ComputeMinCostPath {
             }
         }
         return new PathResult(-1, Collections.emptyList());
+    }
+
+    private static double computeCost(double[][] gMatrix, double[][] fgMatrix, double[][] IxMatrix, double[][] IyMatrix, boolean[][] zeroCrossing,
+                                      Node current, int newRow, int newCol) {
+
+        int px = current.x;
+        int py = current.y;
+        int qx = newRow;
+        int qy = newCol;
+
+        double res =  0.43 * ProcessMatrix.computeFz(zeroCrossing, qx, qy)
+                + 0.43 * ProcessMatrix.computeFd(IxMatrix, IyMatrix, gMatrix, px, py, qx, qy)
+                + 0.14 * ProcessMatrix.computeFg(fgMatrix, px, py, qx, qy);
+        if(Double.isNaN(res)) return 1;
+
+        return res ;
     }
 
     private static double calculateDynamicCost(double[][] fgMatrix, Node current, int newRow, int newCol) {
@@ -227,7 +265,7 @@ public class ComputeMinCostPath {
             }
             System.out.println();
         }
-        PathResult path = findShortestPath(gMatrix, 0, 0, 4, 1);
+        PathResult path = findShortestPath(matrix, 0, 0, 1, 4);
         path.print();
     }
 

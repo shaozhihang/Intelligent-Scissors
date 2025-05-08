@@ -14,7 +14,7 @@ public class CursorSnap {
 
         int maxX = mousePoint[0];
         int maxY = mousePoint[1];
-        double maxGradient = gMatrix[mousePoint[0]][mousePoint[1]];
+        double maxGradient = gMatrix[maxY][maxX];
 
         for (int y = Math.max(0, mousePoint[1] - snapRadius); y <= Math.min(gMatrix.length - 1, mousePoint[1] + snapRadius); y++) {
             for (int x = Math.max(0, mousePoint[0] - snapRadius); x <= Math.min(gMatrix[0].length - 1, mousePoint[0] + snapRadius); x++) {

@@ -59,6 +59,7 @@ public class Frame extends Application {
     private double scaleX;
     private double scaleY;
     private double[][] gMatrix;
+    private int[][] matrix;
 //    private Map<Pair<Node, Node>, List<int[]>> pathCache = new HashMap<>(); // 路径缓存
     private List<List<int[]>> pathSegments = new ArrayList<>(); // 分段存储路径
     private static final int MAX_CACHE_SIZE = 100;
@@ -232,7 +233,7 @@ public class Frame extends Application {
 
         // 计算新路径
         List<int[]> path = ComputeMinCostPath.findShortestPath(
-                gMatrix,
+                matrix,
                 start.getY(),
                 start.getX(),
                 end.getY(),
@@ -292,8 +293,8 @@ public class Frame extends Application {
         if (userPathPoints.size() < 2) return;
 
         int[][] RGBMatrix = ProcessImage.toRGBMatrix(this.bufferedImage);
-        double[][] gMatrix = ProcessMatrix.findGMatrix(RGBMatrix);
-        List<int[]> path = ComputeMinCostPath.findShortestPath(gMatrix,startPoint.y,startPoint.x,endPoint.y,endPoint.x).getPath();
+
+        List<int[]> path = ComputeMinCostPath.findShortestPath(RGBMatrix,startPoint.y,startPoint.x,endPoint.y,endPoint.x).getPath();
         // 转换为屏幕坐标（用于绘制）
         optimizedPathScreen = convertPathToScreenPoints(path);
 
@@ -505,7 +506,8 @@ public class Frame extends Application {
                     });
                 }).start();
 
-                gMatrix = ProcessMatrix.findGMatrix(ProcessImage.toRGBMatrix(bufferedImage));
+                matrix = ProcessImage.toRGBMatrix(bufferedImage);
+                gMatrix = ProcessMatrix.findGMatrix(matrix);
                 // 刷新布局
                 Platform.runLater(() -> {
                     overlayCanvas.setWidth(imageView.getLayoutBounds().getWidth());
