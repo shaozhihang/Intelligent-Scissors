@@ -204,6 +204,9 @@ public class ComputeMinCostPath {
         // 距离因子
         double distanceFactor = Math.hypot(newRow - current.x, newCol - current.y);
 
+        double res = baseCost * directionPenalty * distanceFactor;
+        if(Double.isNaN(res)) return 1;
+
         return baseCost * directionPenalty * distanceFactor;
     }
 

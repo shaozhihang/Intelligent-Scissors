@@ -1,5 +1,9 @@
 package src;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * @author 邵之航
  * @version 1.1
@@ -215,6 +219,17 @@ public class ProcessMatrix {
         double dq = Math.acos(dotQ / (Math.hypot(L[0], L[1]) * Math.hypot(Dq[0], Dq[1])));
 
         return (dp + dq) / Math.PI;
+    }
+
+    // 在ProcessMatrix类中添加梯度缓存机制
+    private static Map<String, double[][]> gradientCache = new HashMap<>();
+
+    public static double[][] getGMatrix(int[][] matrix) {
+        String key = Arrays.deepToString(matrix);
+        if (!gradientCache.containsKey(key)) {
+            gradientCache.put(key, findGMatrix(matrix));
+        }
+        return gradientCache.get(key);
     }
 
     public static void main(String[] args) {

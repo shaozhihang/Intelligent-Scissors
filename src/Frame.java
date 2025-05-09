@@ -61,6 +61,7 @@ public class Frame extends Application {
     private double[][] gMatrix;
     private int[][] matrix;
 //    private Map<Pair<Node, Node>, List<int[]>> pathCache = new HashMap<>(); // 路径缓存
+    private final CursorSnap cursorSnap = new CursorSnap(); // 实例化吸附工具
     private List<List<int[]>> pathSegments = new ArrayList<>(); // 分段存储路径
     private static final int MAX_CACHE_SIZE = 100;
     private final LinkedHashMap<Pair<Node, Node>, List<int[]>> pathCache =
@@ -186,11 +187,13 @@ public class Frame extends Application {
             int[] mousePoint = new int[]{rawSeed.getY(), rawSeed.getX()}; // 注意坐标顺序
 
             // 调用CursorSnap吸附逻辑
-            int[] snappedPoint = new CursorSnap().findSnapPoint(
+            /*int[] snappedPoint = new CursorSnap().findSnapPoint(
                     mousePoint,
                     gMatrix,
                     10 // snapRate（示例值，图像高度的1%）
-            );
+            );*/
+
+            int[] snappedPoint = mousePoint;
 
             // 将吸附后的图像坐标转换为屏幕坐标
             Point2D snappedScreenPoint = new Point2D(
@@ -461,6 +464,65 @@ public class Frame extends Application {
                 overlayCanvas.setHeight(newImg.getHeight());
             }
         });
+
+        overlayCanvas.setOnMouseMoved(this::handleMouseMove);
+    }
+
+    // 实时鼠标移动处理
+    private void handleMouseMove(MouseEvent e) {
+        if (!isMagneticLassoActive) return;
+
+        // 1. 获取当前鼠标位置
+        Point2D rawPoint = new Point2D(e.getX(), e.getY());
+
+        // 2. 执行实时吸附计算
+        Point2D snappedPoint = cursorSnap.realtimeSnap(
+                rawPoint,
+                gMatrix,
+                scaleX,
+                scaleY
+        );
+
+        // 3. 更新UI显示
+        drawSnapFeedback(snappedPoint);
+    }
+
+    // 绘制吸附反馈（例如圆圈标记）
+    private void drawSnapFeedback(Point2D snappedPoint) {
+        GraphicsContext gc = overlayCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, overlayCanvas.getWidth(), overlayCanvas.getHeight());
+
+        // 绘制吸附点标记
+        gc.setStroke(Color.RED);
+        gc.setLineWidth(2);
+        gc.strokeOval(
+                snappedPoint.getX() - 5,
+                snappedPoint.getY() - 5,
+                10,
+                10
+        );
+
+        // 绘制临时路径（如果正在绘制）
+        if (!seedPoints.isEmpty()) {
+            drawCurrentPath(snappedPoint);
+        }
+    }
+
+    // 绘制当前路径段
+    private void drawCurrentPath(Point2D endPoint) {
+        GraphicsContext gc = overlayCanvas.getGraphicsContext2D();
+        gc.setStroke(Color.GREEN);
+
+        SeedPoint lastSeed = seedPoints.getLast();
+        Point2D startPoint = new Point2D(
+                lastSeed.getX() * scaleX,
+                lastSeed.getY() * scaleY
+        );
+
+        gc.beginPath();
+        gc.moveTo(startPoint.getX(), startPoint.getY());
+        gc.lineTo(endPoint.getX(), endPoint.getY());
+        gc.stroke();
     }
 
     private void openImage() {
@@ -517,7 +579,6 @@ public class Frame extends Application {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
         }
     }
 
