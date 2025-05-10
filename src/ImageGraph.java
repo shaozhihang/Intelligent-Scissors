@@ -1,5 +1,7 @@
 package src;
 
+import javafx.geometry.Point2D;
+
 import java.awt.image.BufferedImage;
 import java.util.*;
 
@@ -17,6 +19,11 @@ class Node {
     Node(int x, int y) {
         this.x = x;
         this.y = y;
+    }
+
+    Node(SeedPoint seedPoint) {
+        this.x = seedPoint.getX();
+        this.y = seedPoint.getY();
     }
 
     @Override
