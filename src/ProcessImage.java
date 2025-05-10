@@ -1,7 +1,6 @@
 package src;
 
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferInt;
+import java.awt.image.*;
 import java.util.List;
 import java.util.Map;
 
@@ -23,16 +22,25 @@ public class ProcessImage {
         int height = image.getHeight();
         int[][] pixelMatrix = new int[width][height];
 
-        // 获取像素数据的一维数组
-        int[] pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
+        // 统一转换为 INT_RGB 格式以简化处理
+        if (image.getType() != BufferedImage.TYPE_INT_RGB) {
+            BufferedImage convertedImage = new BufferedImage(
+                    width,
+                    height,
+                    BufferedImage.TYPE_INT_RGB
+            );
+            convertedImage.getGraphics().drawImage(image, 0, 0, null);
+            image = convertedImage;
+        }
 
-        // 将一维数组转换为二维矩阵（按行优先存储）
+        // 直接读取 INT_RGB 格式数据
+        int[] pixels = ((DataBufferInt) image.getRaster().getDataBuffer()).getData();
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
-                int index = y * width + x;
-                pixelMatrix[x][y] = pixels[index];
+                pixelMatrix[x][y] = pixels[y * width + x];
             }
         }
+
         return pixelMatrix;
     }
 
