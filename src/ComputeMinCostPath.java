@@ -1,6 +1,10 @@
 package src;
 
+import java.awt.geom.Point2D;
 import java.util.*;
+
+import static src.ProcessMatrix.findIx;
+import static src.ProcessMatrix.findIy;
 
 /**
  * @author 邵之航
@@ -69,34 +73,41 @@ public class ComputeMinCostPath {
         }
     }
 
-
+    public static PathResult findShortestPath(double[][] fgMatrix, SeedPoint start, SeedPoint end) {
+        int startX = start.getY();
+        int startY = start.getX();
+        int endX = end.getY();
+        int endY = end.getX();
+        return findShortestPath(fgMatrix, startX, startY, endX, endY);
+    }
 
     /**
      * 在梯度矩阵上计算最短路
-     * @param matrix RGB矩阵
+     * @param fgMatrix fg矩阵
      * @param startX 起点横坐标
      * @param startY 起点纵坐标
      * @param endX 终点横坐标
      * @param endY 终点纵坐标
      * @return 最短路径，用PathResult类存储，包含路径长度和路径元素
      */
-    public static PathResult findShortestPath(int[][] matrix, int startX, int startY, int endX, int endY) {
+    public static PathResult findShortestPath(double[][] fgMatrix, int startX, int startY, int endX, int endY) {
 
 
         //初始化
-        double[][] gMatrix = ProcessMatrix.findGMatrix(matrix);
-        double[][] fgMatrix = ProcessMatrix.findFgMatrix(gMatrix);
-        double[][] IxMatrix = new double[matrix.length][matrix[0].length];
-        double[][] IyMatrix = new double[matrix.length][matrix[0].length];
-        boolean[][] zeroCrossing = ProcessMatrix.computeZeroCrossing(matrix);
-        for (int y = 0; y < matrix.length; y++) {      // 图像y坐标
-            for (int x = 0; x < matrix[0].length; x++) {   // 图像x坐标
-                int Ix = ProcessMatrix.findIx(matrix, x, y);      // 传入正确的x,y顺序
-                int Iy = ProcessMatrix.findIy(matrix, x, y);
-                IxMatrix[y][x] = Ix;
-                IyMatrix[y][x] = Iy;
-            }
-        }
+//        double[][] gMatrix = ProcessMatrix.findGMatrix(matrix);
+//        double[][] fgMatrix = ProcessMatrix.findFgMatrix(gMatrix);
+//        double[][] IxMatrix = new double[matrix.length][matrix[0].length];
+//        double[][] IyMatrix = new double[matrix.length][matrix[0].length];
+//        boolean[][] zeroCrossing = ProcessMatrix.computeZeroCrossing(matrix);
+//        double[][] gradDirections = ProcessMatrix.calculateGradientDirections(matrix);
+//        for (int y = 0; y < matrix.length; y++) {      // 图像y坐标
+//            for (int x = 0; x < matrix[0].length; x++) {   // 图像x坐标
+//                int Ix = findIx(matrix, x, y);      // 传入正确的x,y顺序
+//                int Iy = findIy(matrix, x, y);
+//                IxMatrix[y][x] = Ix;
+//                IyMatrix[y][x] = Iy;
+//            }
+//        }
 
         // 参数校验增强
         if (fgMatrix.length == 0 || fgMatrix[0].length == 0) {
@@ -149,8 +160,9 @@ public class ComputeMinCostPath {
 
                 if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
                     // 动态调整代价计算
+//                    double moveCost = calculateDynamicCost(fgMatrix, gradDirections, current, newRow, newCol);
                     double moveCost = calculateDynamicCost(fgMatrix, current, newRow, newCol);
-                    //double moveCost = computeCost(gMatrix, fgMatrix, IxMatrix, IyMatrix, zeroCrossing, current, newRow, newCol);
+//                    double moveCost = computeCost(gMatrix, fgMatrix, IxMatrix, IyMatrix, zeroCrossing, current, newRow, newCol);
                     System.out.println("Cost: " + moveCost);
 
                     double newDistance = current.distance + moveCost;
@@ -204,11 +216,13 @@ public class ComputeMinCostPath {
         // 距离因子
         double distanceFactor = Math.hypot(newRow - current.x, newCol - current.y);
 
-        double res = baseCost * directionPenalty * distanceFactor;
-        if(Double.isNaN(res)) return 1;
 
-        return baseCost * directionPenalty * distanceFactor;
+        double cost = baseCost * directionPenalty * distanceFactor;
+        if (Double.isNaN(cost)) return 1;
+        return cost;
     }
+
+
 
 
     private static PathResult buildPathResult(Node endNode, double distance) {
@@ -227,10 +241,27 @@ public class ComputeMinCostPath {
         return new PathResult(distance, path);
     }
 
+    // 在 ComputeMinCostPath 类中添加增量计算
+    public static PathResult findShortestPathIncremental(
+            double[][] matrix,
+            SeedPoint start,
+            SeedPoint end,
+            List<int[]> previousPath
+    ) {
+        // 如果有前次路径，从终点继续计算
+        if (previousPath != null && !previousPath.isEmpty()) {
+            int[] lastPoint = previousPath.getLast();
+            SeedPoint newStart = new SeedPoint(lastPoint[0], lastPoint[1]);
+            return findShortestPath(matrix, newStart, end);
+        }
+        return findShortestPath(matrix, start, end);
+    }
+
     // 用于返回结果
-    static class PathResult {
+    public static class PathResult {
         double distance;
         List<int[]> path;
+
 
         public PathResult(double distance, List<int[]> path) {
             this.distance = distance;
@@ -254,22 +285,22 @@ public class ComputeMinCostPath {
     }
 
     public static void main(String[] args) {
-        int[][] matrix = {
-                {3, 3, 3, 3, 3},
-                {0, 0, 0, 3, 3},
-                {0, 0, 0, 0, 3},
-                {0, 0, 0, 0, 3},
-                {0, 3, 3, 3, 3}
-        };
-        double[][] gMatrix = ProcessMatrix.findGMatrix(matrix);
-        for (int i = 0; i < gMatrix.length; i++) {
-            for (int j = 0; j < gMatrix[0].length; j++) {
-                System.out.print(gMatrix[i][j] + " ");
-            }
-            System.out.println();
-        }
-        PathResult path = findShortestPath(matrix, 0, 0, 1, 4);
-        path.print();
+//        int[][] matrix = {
+//                {3, 3, 3, 3, 3},
+//                {0, 0, 0, 3, 3},
+//                {0, 0, 0, 0, 3},
+//                {0, 0, 0, 0, 3},
+//                {0, 3, 3, 3, 3}
+//        };
+//        double[][] gMatrix = ProcessMatrix.findGMatrix(matrix);
+//        for (int i = 0; i < gMatrix.length; i++) {
+//            for (int j = 0; j < gMatrix[0].length; j++) {
+//                System.out.print(gMatrix[i][j] + " ");
+//            }
+//            System.out.println();
+//        }
+//        PathResult path = findShortestPath(matrix, 0, 0, 1, 4);
+//        path.print();
     }
 
 }

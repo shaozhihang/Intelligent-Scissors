@@ -49,7 +49,7 @@ public class ProcessImage {
      * @param image 要处理的Image类型图像
      * @return 一个包含节点与其所连接的边们的映射列表
      */
-    public static Map<Node, List<Edge>> toGraph(BufferedImage image) {
+    public static Map<Node, List<Frame.Edge>> toGraph(BufferedImage image) {
         return ImageGraph.buildGraph(image);
     }
 

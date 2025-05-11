@@ -232,6 +232,29 @@ public class ProcessMatrix {
         return gradientCache.get(key);
     }
 
+    public static double[][] calculateGradientDirections(int[][] matrix) {
+        int height = matrix.length;
+        int width = matrix[0].length;
+        double[][] directions = new double[height][width];
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int Ix = findIx(matrix, x, y);
+                int Iy = findIy(matrix, x, y);
+                // 计算梯度方向角度（弧度），范围[-π, π]
+                directions[y][x] = Math.atan2(Iy, Ix);
+            }
+        }
+        return directions;
+    }
+
+    public static double findMaxGradient(double[][] gMatrix) {
+        return Arrays.stream(gMatrix)
+                .flatMapToDouble(Arrays::stream)
+                .max()
+                .orElse(1.0);
+    }
+
     public static void main(String[] args) {
         // 测试代码
         int[][] matrix = {

@@ -1,5 +1,7 @@
 package src;
 
+import javafx.geometry.Point2D;
+
 import java.awt.image.BufferedImage;
 import java.util.*;
 
@@ -17,6 +19,11 @@ class Node {
     Node(int x, int y) {
         this.x = x;
         this.y = y;
+    }
+
+    Node(SeedPoint seedPoint) {
+        this.x = seedPoint.getX();
+        this.y = seedPoint.getY();
     }
 
     @Override
@@ -57,10 +64,10 @@ public class ImageGraph {
             {1, -1},  {1, 0}, {1, 1}
     };
 
-    protected static Map<Node, List<Edge>> buildGraph(BufferedImage image) {
+    protected static Map<Node, List<Frame.Edge>> buildGraph(BufferedImage image) {
         int width = image.getWidth();
         int height = image.getHeight();
-        Map<Node, List<Edge>> graph = new HashMap<>();
+        Map<Node, List<Frame.Edge>> graph = new HashMap<>();
         Node[][] nodes = new Node[width][height];
 
         // 初始化所有节点
