@@ -1,6 +1,8 @@
 package src;
 
 // =============================import===========================
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.beans.property.BooleanProperty;
@@ -21,22 +23,24 @@ import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Polygon;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeLineJoin;
-import javafx.scene.shape.StrokeType;
 import javafx.stage.*;
+import javafx.util.Duration;
 import javafx.util.Pair;
 
 import java.awt.Image;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.stream.Collectors;
 
 // =============================import===========================
@@ -108,8 +112,16 @@ public class Frame extends Application {
     private double currentSpeed = 0;
     private WritableImage exportImage; // 导出的最终图像
     private WritableImage selectionMask; // 选区蒙版
-    private boolean LassoDone;
-
+    private boolean isSelectionCompleted;
+    private volatile boolean isCalculating = false; // 计算状态锁
+    private Point2D lastMousePosition = null;      // 记录最新鼠标位置
+    private long lastCalculateTime = 0;            // 最后计算时间戳
+    private static final long CALCULATE_INTERVAL = 50; // 计算间隔50ms
+    private ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
+    private double currentAreaGradient = 0.0;
+    private Timeline borderAnimation; // 为了让虚线更好看
+//    private boolean isSelectionCompleted = false;
+    private List<Point2D> selectionPolygon = new ArrayList<>();
 
     // ===========================场景中的对象===========================
 
@@ -153,9 +165,26 @@ public class Frame extends Application {
         primaryStage.getIcons().add(icon);
         // 添加场景
         scene.getStylesheets().add(getClass().getResource("/style.css").toExternalForm());
+        initCanvas();
         primaryStage.setScene(scene);
 
         primaryStage.show();
+    }
+
+    private void initCanvas() {
+        // 抗锯齿优化
+        System.setProperty("prism.msaa", "8");
+
+        overlayCanvas.setCache(true);
+        overlayCanvas.setCacheHint(CacheHint.QUALITY);
+    }
+
+    private void initPathState() {
+        currentPath = new ArrayList<>();
+        seedPoints = new ArrayList<>();
+        currentSeed = null;
+        lastInsertDistance = 0;
+        currentPathDistance = 0;
     }
 
     private void initToolBar(Scene scene, List<Point2D> optimizedPathScreen) {
@@ -170,17 +199,25 @@ public class Frame extends Application {
         addSnapControls();
 
         // 按钮事件绑定
-        openBtn.setOnAction(e -> openImage());
+        openBtn.setOnAction(e -> {
+            try {
+                openImage();
+            } catch (IOException ex) {
+                showAlert("无法解码该图像文件");;
+            } catch (NullPointerException ex) {
+                showAlert("无法解码该图像文件！\n原因：文件损坏或路径失效");
+            }
+        });
         exportBtn.setOnAction(e -> exportImage());
         selectBtn.setOnAction(e -> {
             isMagneticLassoActive = false;
-            LassoDone = false;
+            isSelectionCompleted = false;
             scene.setCursor(Cursor.DEFAULT);});
 
         // 智能套索按钮事件
         lassoBtn.setOnAction(e -> {
             isMagneticLassoActive = true;
-            LassoDone = false;
+            isSelectionCompleted = false;
             scene.setCursor(Cursor.CROSSHAIR);
             seedPoints.clear();            // 清空旧种子点
             optimizedPathScreen.clear();   // 清空旧路径
@@ -253,11 +290,16 @@ public class Frame extends Application {
     }
 
     private void handleMagneticLassoPress(MouseEvent e) {
+
         System.out.printf("[EVENT] Press at (%.1f, %.1f) CanvasSize: %.0fx%.0f%n",
                 e.getX(), e.getY(),
                 overlayCanvas.getWidth(),
                 overlayCanvas.getHeight());
-        if (isMagneticLassoActive && e.getButton() == MouseButton.PRIMARY) {
+        if (isMagneticLassoActive && e.getButton() == MouseButton.PRIMARY && !isSelectionCompleted) {
+            if (seedPoints.isEmpty()) {
+                initPathState();
+            }
+
             System.out.println("[Debug] 条件满足：模式已激活 + 左键点击");
             Point2D rawScreenPoint = new Point2D(e.getX(), e.getY());
 
@@ -279,7 +321,10 @@ public class Frame extends Application {
 
             // 检测是否闭合路径
             if (!seedPoints.isEmpty() && isNearFirstSeed(snappedScreenPoint)) {
+
+//                completeLasso2();
                 completeLasso();
+                completeSelection();
                 return;
             }
 
@@ -299,6 +344,15 @@ public class Frame extends Application {
             drawOverlay(optimizedPathScreen);
             System.out.println("种子点已添加: " + newSeed.getX() + ", " + newSeed.getY());
         }
+    }
+
+    private void completeSelection() {
+        isSelectionCompleted = true;
+        selectionPolygon = new ArrayList<>(optimizedPathScreen);
+        optimizedPathScreen.clear();
+        seedPoints.clear();
+        currentPath.clear();
+        drawOverlay(); // 此时会调用其中的 drawSelectionBorder 而非 drawPathMarkers
     }
 
     private List<int[]> computeAndCachePath(SeedPoint start, SeedPoint end) {
@@ -366,20 +420,10 @@ public class Frame extends Application {
     private void handleMagneticLassoRelease(MouseEvent e, Scene scene) {
     }
 
-    //    private void optimizePath(Node startPoint, Node endPoint) {
-//        if (userPathPoints.size() < 2) return;
-//
-//        List<int[]> path = ComputeMinCostPath.findShortestPath(fgMatrix,startPoint.y,startPoint.x,endPoint.y,endPoint.x).getPath();
-//        // 转换为屏幕坐标（用于绘制）
-//        optimizedPathScreen = convertPathToScreenPoints(path);
-//
-//        // 重绘覆盖层
-//        drawOverlay(optimizedPathScreen);
-//    }
     private void optimizePath(Node startPoint, Node endPoint) {
         List<int[]> path;
         if (enableAutoAnchor) { // 新增配置开关
-            path = computePathWithAutoAnchor(NodesToSeed(startPoint), NodesToSeed(endPoint));
+            path = computePathWithAutoSeedPoint(NodesToSeed(startPoint), NodesToSeed(endPoint));
         } else {
             path = ComputeMinCostPath.findShortestPath(fgMatrix,startPoint.y,startPoint.x,endPoint.y,endPoint.x).getPath();
         }
@@ -392,17 +436,116 @@ public class Frame extends Application {
         drawOverlay(optimizedPathScreen);
     }
 
-    private void optimizePath2(Point2D start, Point2D end) {
-        Node startPoint = new Node(convertToSeedPoint(start));
-        Node endPoint = new Node(convertToSeedPoint(end));
-        if (userPathPoints.size() < 2) return;
+    private void completeLasso2() {
+        isSelectionCompleted = true;
+        // 复制优化后的路径点
+        selectionPolygon = new ArrayList<>(optimizedPathScreen);
 
-        List<int[]> path = ComputeMinCostPath.findShortestPath(fgMatrix,startPoint.y,startPoint.x,endPoint.y,endPoint.x).getPath();
-        // 转换为屏幕坐标（用于绘制）
-        optimizedPathScreen = convertPathToScreenPoints(path);
+        // 强制闭合路径（添加首点作为终点）
+        if (!selectionPolygon.isEmpty() && !selectionPolygon.getFirst().equals(selectionPolygon.getLast())) {
+            selectionPolygon.add(selectionPolygon.getFirst());
+        }
 
-        // 重绘覆盖层
-        drawOverlay(optimizedPathScreen);
+        // 打印调试信息
+        System.out.println("Selection completed. Points count: " + selectionPolygon.size());
+
+        // 清空临时路径
+        optimizedPathScreen.clear();
+        seedPoints.clear();
+
+        // 强制重绘画布
+        Platform.runLater(() -> drawOverlay());
+    }
+
+    private void drawOverlay() {
+        GraphicsContext gc = overlayCanvas.getGraphicsContext2D();
+        gc.clearRect(0, 0, overlayCanvas.getWidth(), overlayCanvas.getHeight());
+
+        if (isSelectionCompleted) {
+            drawSelectionBorder(gc);
+        } else {
+            drawPathMarkers(gc);
+        }
+    }
+
+    private void drawPathMarkers(GraphicsContext gc) {
+        // 绘制所有种子点
+        for (SeedPoint seed : seedPoints) {
+            drawSeedMarker(gc, seed);
+        }
+
+        // 绘制当前路径
+        if (!currentPath.isEmpty()) {
+            drawCurrentPath(gc);
+        }
+
+        // 绘制自动锚点
+        drawAutoAnchors(gc);
+    }
+
+    private void drawAutoAnchors(GraphicsContext gc) {
+        gc.setFill(Color.ORANGE.deriveColor(0, 1, 1, 0.7));
+        autoAnchors.forEach(p -> {
+            gc.fillOval(p.getX() - 4, p.getY() - 4, 8, 8);
+            gc.strokeOval(p.getX() - 5, p.getY() - 5, 10, 10);
+        });
+    }
+
+    private void drawCurrentPath(GraphicsContext gc) {
+        gc.setStroke(Color.GREEN);
+        gc.setLineWidth(1.2);
+        gc.beginPath();
+
+        // 遍历路径点
+        for (int i = 0; i < currentPath.size(); i++) {
+            int[] point = currentPath.get(i);
+            double x = point[0] * scaleX; // 转换为屏幕坐标
+            double y = point[1] * scaleY;
+
+            if (i == 0) {
+                gc.moveTo(x, y);
+            } else {
+                gc.lineTo(x, y);
+            }
+        }
+        gc.stroke();
+    }
+
+    private void drawSelectionBorder(GraphicsContext gc) {
+        gc.setStroke(Color.BLUE);
+        gc.setLineWidth(1.5);
+        gc.setLineDashes(5, 5);
+        gc.setLineDashOffset(0);
+
+        // 绘制闭合路径
+        gc.beginPath();
+        if (!selectionPolygon.isEmpty()) {
+            gc.moveTo(selectionPolygon.getFirst().getX(), selectionPolygon.getFirst().getY());
+            for (Point2D p : selectionPolygon) {
+                gc.lineTo(p.getX(), p.getY());
+            }
+        }
+        gc.stroke();
+    }
+
+    private void startBorderAnimation() {
+        GraphicsContext gc = overlayCanvas.getGraphicsContext2D();
+        borderAnimation = new Timeline(
+                new KeyFrame(Duration.millis(100), e -> {
+                    double offset = gc.getLineDashOffset();
+                    gc.setLineDashOffset(offset - 1);
+                })
+        );
+        borderAnimation.setCycleCount(Timeline.INDEFINITE);
+        borderAnimation.play();
+    }
+
+
+    // 停止动画
+    private void stopBorderAnimation() {
+        if (borderAnimation != null) {
+            borderAnimation.stop();
+        }
     }
 
     // ======================================converting methods=========================================
@@ -517,12 +660,12 @@ public class Frame extends Application {
         gc.setLineJoin(StrokeLineJoin.ROUND);
 
         // 绘制原始图像
-        if (imageView.getImage() != null && LassoDone) {
+        if (imageView.getImage() != null && isSelectionCompleted) {
             gc.drawImage(imageView.getImage(), 0, 0);
         }
 
         // 绘制选区蒙版
-        if (selectionMask != null && LassoDone) {
+        if (selectionMask != null && isSelectionCompleted) {
             gc.setGlobalAlpha(0.5); // 半透明显示选区
             gc.drawImage(selectionMask, 0, 0);
             gc.setGlobalAlpha(1.0);
@@ -614,36 +757,79 @@ public class Frame extends Application {
 
     // 实时鼠标移动处理
     private void handleMouseMove(MouseEvent e) {
-        if (!isMagneticLassoActive || seedPoints.isEmpty()) return;
+        if (!isMagneticLassoActive || seedPoints.isEmpty() || isSelectionCompleted) return;
 
         Point2D rawPoint = new Point2D(e.getX(), e.getY());
-        Point2D finalPoint = rawPoint;
+        Point2D finalPoint;
 
-        // 根据吸附状态处理
+        // 吸附处理
         if (snapEnabled.get()) {
             finalPoint = cursorSnap.realtimeSnap(
                     rawPoint,
                     gMatrix,
                     scaleX,
                     scaleY,
-                    snapRadius.intValue() // 添加半径参数
+                    snapRadius.intValue()
             );
+        } else {
+            finalPoint = rawPoint;
         }
 
+        SeedPoint pos = convertToSeedPoint(finalPoint, true);
 
-        SeedPoint pos = convertToSeedPoint(finalPoint,true);
-        ComputeMinCostPath.PathResult path = ComputeMinCostPath.findShortestPath(fgMatrix,currentSeed, pos);
-        this.currentPath = path.getPath();
-        this.currentPathDistance = calculateTotalPathDistance();
-        double currentDistance = currentPathDistance;
-        drawSnapFeedback(finalPoint, e);
-        // 触发自动插入
-        if (currentDistance - lastInsertDistance >= DISTANCE_INTERVAL) {
-            autoAddSeedAlongPath(finalPoint);
-            lastInsertDistance = currentDistance;
+        // 节流控制
+        if (!isCalculating &&
+                System.currentTimeMillis() - lastCalculateTime > CALCULATE_INTERVAL) {
+
+            isCalculating = true;
+            lastCalculateTime = System.currentTimeMillis();
+            updateCurrentAreaGradient();
+
+            try {
+                ComputeMinCostPath.PathResult path =
+                        ComputeMinCostPath.findShortestPath(fgMatrix, currentSeed, pos);
+
+                // 有效性检查
+                if (path.getPath().isEmpty()) {
+                    System.err.println("路径计算失败");
+                    return;
+                }
+                long costTime = System.currentTimeMillis() - lastCalculateTime;
+                if (costTime > 100) {
+                    Point2D screenPos = new Point2D(e.getScreenX(), e.getScreenY());
+                    TooltipManager.showTooltip(this.primaryStage, "复杂区域建议手动添加种子点",
+                            screenPos.getX(),
+                            screenPos.getY()
+                    );
+                }
+
+                this.currentPath = path.getPath();
+                this.currentPathDistance = calculateTotalPathDistance();
+
+                // 触发自动插入
+                if (shouldAutoInsert(finalPoint)) {
+                    autoAddSeedAlongPath(finalPoint);
+                    lastInsertDistance = currentPathDistance;
+                }
+
+            } finally {
+                isCalculating = false;
+            }
         }
+
+        // 更新光标位置
         int[] currentPos = {(int)finalPoint.getX(), (int)finalPoint.getY()};
-        currentPath.add(currentPos);
+        if (!currentPath.contains(currentPos)) {
+            currentPath.add(currentPos);
+        }
+
+        drawSnapFeedback(finalPoint, e);
+    }
+
+    private List<int[]> calculatePath(Point2D mousePos) {
+        SeedPoint start = currentSeed;
+        SeedPoint end = convertToSeedPoint(mousePos);
+        return ComputeMinCostPath.findShortestPath(fgMatrix, start, end).getPath();
     }
 
 
@@ -850,7 +1036,7 @@ public class Frame extends Application {
         drawSeedPoints(gc);
     }
 
-    private void openImage() {
+    private void openImage() throws IOException {
         FileChooser fileChooser = new FileChooser();
         File file = fileChooser.showOpenDialog(this.primaryStage);
         if (file != null) {
@@ -906,10 +1092,39 @@ public class Frame extends Application {
                 this.maxGradient = ProcessMatrix.findMaxGradient(this.gMatrix);
                 this.imageComplexity = calculateImageComplexity();
                 this.autoAnchorThreshold = 100 * (1 + imageComplexity / 255.0);
-                LassoDone = false;
+
+                isSelectionCompleted = false;
                 exportImage = (WritableImage) imageView.getImage();
             } catch (IOException e) {
                 e.printStackTrace();
+                bufferedImage = readImageWithDecoder(file);
+
+                if (bufferedImage == null) {
+                    showAlert("无法解码该图像文件");
+                    return;
+                }
+
+                javafx.scene.image.Image fxImage = SwingFXUtils.toFXImage(bufferedImage, null);
+                imageView.setImage(fxImage);
+            } catch (NullPointerException e) {
+                showAlert("无法解码该图像文件！\n原因：文件损坏或路径失效");
+            }
+        }
+    }
+
+    private BufferedImage readImageWithDecoder(File file) throws IOException {
+        try (ImageInputStream iis = ImageIO.createImageInputStream(file)) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
+            if (!readers.hasNext()) {
+                throw new IOException("无兼容解码器");
+            }
+
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(iis);
+                return reader.read(0);
+            } finally {
+                reader.dispose();
             }
         }
     }
@@ -1037,7 +1252,7 @@ public class Frame extends Application {
 
     // 取消操作
     private void cancelMagneticLasso() {
-        LassoDone = false;
+        isSelectionCompleted = false;
         exportImage = (WritableImage) imageView.getImage();
         seedPoints.clear();
         currentSeed = null;
@@ -1052,7 +1267,7 @@ public class Frame extends Application {
     // 撤销上一个种子点
     private void undoLastSeed() {
         if (!seedPoints.isEmpty()) {
-            LassoDone = false;
+            isSelectionCompleted = false;
             exportImage = (WritableImage) imageView.getImage();
             seedPoints.removeLast();
             currentSeed = seedPoints.isEmpty() ? null : seedPoints.getLast();
@@ -1064,7 +1279,7 @@ public class Frame extends Application {
     // 闭合路径
     private void completeLasso() {
         if (seedPoints.size() < 3) return;
-        LassoDone = true;
+        isSelectionCompleted = true;
 
 
         // 连接首尾
@@ -1425,7 +1640,7 @@ public class Frame extends Application {
         return true;
     }
 
-    private List<int[]> computePathWithAutoAnchor(SeedPoint start, SeedPoint end) {
+    private List<int[]> computePathWithAutoSeedPoint(SeedPoint start, SeedPoint end) {
         List<int[]> fullPath = new ArrayList<>();
 
         if (!needAutoAnchor(start, end)) {
@@ -1440,36 +1655,32 @@ public class Frame extends Application {
         }
 
         SeedPoint mid = candidates.stream()
-                .max(Comparator.comparingDouble(p -> gMatrix[p.getY()][p.getX()]))
+                .max(Comparator.comparingDouble(p ->
+                        // 权重公式：梯度 + 方向一致性 - 曲率惩罚
+                        gMatrix[p.getY()][p.getX()] * 0.7 +
+                                directionConsistency(p) * 0.3 -
+                                Math.abs(curvature(p)) * 0.2
+                ))
                 .orElse(null);
-        if (mid == null) return Collections.emptyList();
 
-        if (mid != null) {
-            // 记录自动生成的锚点（屏幕坐标）
-            Point2D screenPoint = convertToScreenCoordinates(mid.getX(), mid.getY());
-            Platform.runLater(() -> {
-                autoAnchors.add(screenPoint);
-            });
-        }
+        // 记录自动生成的锚点（屏幕坐标）
+        Point2D screenPoint = convertToScreenCoordinates(mid.getX(), mid.getY());
+        Platform.runLater(() -> {
+            autoAnchors.add(screenPoint);
+        });
 
-        // 4. 记录自动生成的锚点（添加到成员变量集合）
+        // 记录自动生成的锚点（添加到成员变量集合）
         Point2D screenMid = convertToScreenCoordinates(mid.getX(), mid.getY());
         Platform.runLater(() -> autoAnchors.add(screenMid));
 
-        // 5. 递归计算子路径
-        List<int[]> path1 = computePathWithAutoAnchor(start, mid);
-        List<int[]> path2 = computePathWithAutoAnchor(mid, end);
+        // 递归计算子路径
+        List<int[]> path1 = computePathWithAutoSeedPoint(start, mid);
+        List<int[]> path2 = computePathWithAutoSeedPoint(mid, end);
 
-        // 6. 合并路径（去重中点）
+        // 合并路径（去重中点）
         return mergePaths(path1, path2);
     }
 
-
-    private double calculatePathCost(List<int[]> path) {
-        return path.stream()
-                .mapToDouble(p -> gMatrix[p[1]][p[0]])
-                .sum();
-    }
 
     private List<SeedPoint> selectTopCandidates(List<SeedPoint> candidates, int maxCount) {
         // 按梯度值降序排序
@@ -1496,40 +1707,6 @@ public class Frame extends Application {
         mergedPath.addAll(p2);
 
         return mergedPath;
-    }
-
-    private void autoInsertSeed(SeedPoint start, Point2D cursorPos) {
-        // 转换光标位置为图像坐标
-        SeedPoint end = convertToSeedPoint(cursorPos);
-
-        // 计算两点间距离
-        double distance = Math.hypot(end.getX() - start.getX(), end.getY() - start.getY());
-
-        double autoInsertThreshold = calculateDynamicThreshold();
-        if (distance > autoInsertThreshold) {
-            // 查找中间候选点
-            SeedPoint mid = findBestMidPoint(start, end);
-
-            if (mid != null) {
-                // 递归处理前半段路径
-                autoInsertSeed(start, convertToScreenCoordinates(mid.getX(),mid.getY()));
-
-                // 添加自动生成的中间点
-                mid = new SeedPoint(mid.getX(), mid.getY(), true);
-                seedPoints.add(mid);
-                currentSeed = mid;
-
-                // 递归处理后半段路径
-                autoInsertSeed(mid, cursorPos);
-            }
-        }
-    }
-
-    private SeedPoint findBestMidPoint(SeedPoint start, SeedPoint end) {
-        List<SeedPoint> candidates = findMidCandidates(start, end);
-        return candidates.stream()
-                .max(Comparator.comparing(p -> gMatrix[p.getY()][p.getX()]))
-                .orElse(null);
     }
 
     private double calculateImageComplexity() {
@@ -1580,6 +1757,70 @@ public class Frame extends Application {
         double angle1 = Math.atan2(dy1, dx1);
         double angle2 = Math.atan2(dy2, dx2);
         return Math.abs(angle2 - angle1); // 角度差绝对值
+    }
+
+    // 计算候选点与当前路径方向的一致性（0~1）
+    private double directionConsistency(SeedPoint p) {
+        if (currentPath.size() < 2) return 1.0;
+
+        // 获取当前路径方向
+        int[] prevPoint = currentPath.get(currentPath.size()-2);
+        int[] currentPoint = currentPath.get(currentPath.size()-1);
+        double dx = currentPoint[0] - prevPoint[0];
+        double dy = currentPoint[1] - prevPoint[1];
+        double pathDir = Math.atan2(dy, dx);
+
+        // 计算候选点方向
+        double candidateDir = Math.atan2(p.getY() - currentPoint[1], p.getX() - currentPoint[0]);
+
+        // 方向夹角余弦值
+        return Math.abs(Math.cos(pathDir - candidateDir));
+    }
+
+    // 计算曲率惩罚项（曲率越大惩罚越高）
+    private double curvature(SeedPoint p) {
+        if (currentPath.size() < 3) return 0;
+
+        int[] p0 = currentPath.get(currentPath.size()-3);
+        int[] p1 = currentPath.get(currentPath.size()-2);
+        int[] p2 = currentPath.getLast();
+
+        // 计算三点间曲率
+        double k = computeCurvature(p0, p1, p2);
+        return Math.abs(k);
+    }
+
+    private boolean shouldAutoInsert(Point2D finalPoint) {
+        // 条件1：达到距离间隔
+        boolean distanceCondition = (currentPathDistance - lastInsertDistance >= DISTANCE_INTERVAL);
+
+        // 条件2：路径近似直线且长度超过阈值
+        boolean straightLineCondition = isStraightLine() &&
+                currentPathDistance - lastInsertDistance >= DISTANCE_INTERVAL * 0.6;
+
+        // 条件3：当前区域梯度低于阈值但路径长度足够
+        double currentAreaGradient = this.currentAreaGradient;
+        boolean lowGradientCondition = currentAreaGradient < 30 &&
+                currentPathDistance - lastInsertDistance >= DISTANCE_INTERVAL * 1.2;
+
+        return distanceCondition || straightLineCondition || lowGradientCondition;
+    }
+
+    // 判断当前路径是否近似直线
+    private boolean isStraightLine() {
+        if (currentPath.size() < 3) return false;
+
+        int[] first = currentPath.get(0);
+        int[] last = currentPath.get(currentPath.size()-1);
+
+        // 计算起点到终点的直线距离
+        double straightDist = Math.hypot(last[0]-first[0], last[1]-first[1]);
+
+        // 计算路径实际长度
+        double actualDist = calculateTotalPathDistance();
+
+        // 直线度 = 直线距离 / 实际路径长度
+        return (straightDist / actualDist) > 0.95;
     }
 
     private int selectBestCandidate(List<CandidateScore> scores) {
@@ -1719,6 +1960,42 @@ public class Frame extends Application {
         return dist;
     }
 
+    // 更新区域梯度方法
+    private void updateCurrentAreaGradient() {
+        if (currentPath.isEmpty()) {
+            currentAreaGradient = 0.0;
+            return;
+        }
+
+        // 定义采样区域半径
+        int radius = 5; // 可根据需求调整
+        double totalGradient = 0.0;
+        int count = 0;
+
+        // 遍历最近N个路径点（示例取最后10个点）
+        int sampleCount = Math.min(10, currentPath.size());
+        for (int i = currentPath.size() - sampleCount; i < currentPath.size(); i++) {
+            int[] point = currentPath.get(i);
+            int x = point[0];
+            int y = point[1];
+
+            // 采集周围区域梯度
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dy = -radius; dy <= radius; dy++) {
+                    int px = x + dx;
+                    int py = y + dy;
+                    if (px >= 0 && px < gMatrix[0].length &&
+                            py >= 0 && py < gMatrix.length) {
+                        totalGradient += gMatrix[py][px];
+                        count++;
+                    }
+                }
+            }
+        }
+
+        currentAreaGradient = (count > 0) ? (totalGradient / count) : 0.0;
+    }
+
     private void updateMovementState(Point2D newPosition) {
         long currentTime = System.currentTimeMillis();
         if (lastMovePosition != null) {
@@ -1754,6 +2031,27 @@ public class Frame extends Application {
                 start.getX() + dx * 0.7 + dy * 0.2,
                 start.getY() + dy * 0.7 - dx * 0.2
         );
+    }
+
+    private double computeCurvature(int[] p0, int[] p1, int[] p2) {
+        // 计算三点间向量差
+        double dx1 = p1[0] - p0[0];
+        double dy1 = p1[1] - p0[1];
+        double dx2 = p2[0] - p1[0];
+        double dy2 = p2[1] - p1[1];
+
+        // 计算向量叉积（方向变化量）
+        double crossProduct = dx1 * dy2 - dy1 * dx2;
+
+        // 计算向量长度
+        double len1 = Math.hypot(dx1, dy1);
+        double len2 = Math.hypot(dx2, dy2);
+
+        // 防止除以零
+        if (len1 < 1e-6 || len2 < 1e-6) return 0.0;
+
+        // 曲率公式
+        return (2 * Math.abs(crossProduct)) / (len1 * len2);
     }
 
     private List<Point2D> generateBezierPoints(Point2D p0, Point2D p1, Point2D p2, int segments) {

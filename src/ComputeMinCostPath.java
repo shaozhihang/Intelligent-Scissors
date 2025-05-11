@@ -241,10 +241,27 @@ public class ComputeMinCostPath {
         return new PathResult(distance, path);
     }
 
+    // 在 ComputeMinCostPath 类中添加增量计算
+    public static PathResult findShortestPathIncremental(
+            double[][] matrix,
+            SeedPoint start,
+            SeedPoint end,
+            List<int[]> previousPath
+    ) {
+        // 如果有前次路径，从终点继续计算
+        if (previousPath != null && !previousPath.isEmpty()) {
+            int[] lastPoint = previousPath.getLast();
+            SeedPoint newStart = new SeedPoint(lastPoint[0], lastPoint[1]);
+            return findShortestPath(matrix, newStart, end);
+        }
+        return findShortestPath(matrix, start, end);
+    }
+
     // 用于返回结果
     public static class PathResult {
         double distance;
         List<int[]> path;
+
 
         public PathResult(double distance, List<int[]> path) {
             this.distance = distance;
